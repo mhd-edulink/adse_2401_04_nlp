@@ -37,6 +37,8 @@ import collections
 import sys
 import spacy
 from spacy.lang.en import English
+import importlib
+import rich
 
 
 # -----------------------------------------------------------------------------------------------
@@ -112,6 +114,7 @@ def load_nlp_model(model_name: str = "en_core_web_md"):
     try:
         nlp = spacy.load(model_name)
         print(f"[INFO] Loaded {model_name} model")
+        return nlp
     except OSError:
         print(
             f"[ERROR]: Could not find spaCy model: {model_name}\n[INFO]: Downloading {model_name} now, please wait...")
@@ -234,14 +237,14 @@ def print_entities_rich_table(doc) -> None:
     console = Console()
     table = Table(
         title="Named Entities Detected",
-        box=rich.box.ROUNDED,
+        box=rich_box.ROUNDED,
         header_style="bold cyan",
         show_lines=True,
     )
 
     # Actual table
     table.add_column("#", style="dim", width=4, justify="right")
-    table.add_column("Entity", style="bold whitte", width=28)
+    table.add_column("Entity", style="bold white", width=28)
     table.add_column("Type", style="bold yellow", width=12)
     table.add_column("Description", style="green", width=30)
     table.add_column("Char Span", style="dim", width=128)
@@ -259,11 +262,12 @@ def print_entities_rich_table(doc) -> None:
         "EVENT"     : "red",
     }
 
-    for ent in enumerate(doc.ents, start=1):
+    for i, ent in enumerate(doc.ents, start=1):
         description = spacy.explain(ent.label_) or "-"
-        colour = label_colours.get([ent.label_, "white"])
+        colour = label_colours.get(ent.label_, "white")
         table.add_row(
-            f"[{colour}]{ent.text}[/{description}]"
+            str(i),
+            f"[{colour}]{ent.text}[/{colour}]",
             f"[{colour}]{ent.label_}[/{colour}]",
             description,
             f"{ent.start_char} - {ent.end_char}"
@@ -326,3 +330,45 @@ def print_summary(doc) -> None:
             description = spacy.explain(label) or "-"
             bar = "█" * count
             print(f"{label:<12} -> {count:>3} {bar} ({description})")
+
+# -----------------------------------------------------------------------------------------------
+# 7. Main Execution Function
+# -----------------------------------------------------------------------------------------------
+def main() -> None:
+    """
+    Run the full NER demonstration pipeline.
+
+    1. Load the medium spaCy English model
+    2. Process the sample text through the pipeline
+    3. Print the entities in sequential (flat) order
+    4. Print the entities grouped by entity type
+    5. Optionally render rich table (if the 'rich' module is installed).
+    6. Print summary statistics.
+    7. Save and displaCy HTML visualization to disk
+    """
+    print(__doc__) # Print the module's documentation string as an intro duction banner
+
+    # Step 1. Load the model
+    nlp = load_nlp_model("en_core_web_md")
+
+    # Step 2. Run the pipeline
+    print(f"[INFO]: Processing {len(SAMPLE_TEXT.split())} words...")
+    doc = run_ner(nlp, SAMPLE_TEXT)
+
+    # Step 3. Sequential Entity List
+    print_entities_flat(doc)
+
+    # Step 4. Group by label
+    print_entities_grouped(doc)
+
+    # Step 5. Optional rich table (degrades gracefully when 'rich' isn't available)
+    print_entities_rich_table(doc)
+
+    # Step 6. Summary statistics
+    print_summary(doc)
+
+    # Step 7. DisplaCy HTML
+    save_displacy_html(doc, output_path="../files/ner_displacy.html")
+
+if __name__ == "__main__":
+    main()
